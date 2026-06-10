@@ -1,10 +1,8 @@
 # Dependencies
 node_modules/
 
-# Environment variables (NEVER commit secrets)
+# Environment variables
 .env
-.env.local
-.env.production
 
 # Logs
 logs/
@@ -15,9 +13,17 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# IDE
+# Coverage
+coverage/
+
+# Build files
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+
+# IDE files
 .vscode/
 .idea/
-
-# Notifications log (contains order data)
-notifications.log
