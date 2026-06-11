@@ -25,6 +25,8 @@ const server = http.createServer(app);
 
 const allowedOrigins = [
     process.env.FRONTEND_URL,
+    process.env.CLIENT_URL,
+    "https://jaipur-gifts.netlify.app",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
