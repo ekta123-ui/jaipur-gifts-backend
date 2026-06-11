@@ -174,5 +174,6 @@ const startServer = async () => {
         console.log(`🚀 Jaipur Gifts server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
     });
 };
+app.set('trust proxy', 1);
 
 startServer();
