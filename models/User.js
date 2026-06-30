@@ -40,6 +40,10 @@ const userSchema = new mongoose.Schema(
                 type: String, // gift IDs (string-based IDs as in frontend)
             }
         ],
+        pushSubscription: {
+            type: mongoose.Schema.Types.Mixed,
+            default: null,
+        },
         isActive: {
             type: Boolean,
             default: true,

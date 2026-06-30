@@ -52,6 +52,30 @@ const orderSchema = new mongoose.Schema(
             enum: ['cod', 'upi', 'card', 'netbanking'],
             default: 'cod',
         },
+        occasion: {
+            type: String,
+            default: '',
+        },
+        recipientName: {
+            type: String,
+            default: '',
+        },
+        giftNote: {
+            type: String,
+            default: '',
+        },
+        orderMessage: {
+            type: String,
+            default: '',
+        },
+        specialInstructions: {
+            type: String,
+            default: '',
+        },
+        uploadedImage: {
+            type: String,
+            default: '',
+        },
         trackingId: {
             type: String,
             default: null,

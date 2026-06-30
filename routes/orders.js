@@ -1,7 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+const webpush = require('web-push');
 const router  = express.Router();
 const { body, validationResult } = require('express-validator');
 const Order   = require('../models/Order');
@@ -10,6 +11,30 @@ const User    = require('../models/User');
 const CustomRequest = require('../models/CustomRequest');
 const Review = require('../models/Review');
 const { protect, adminOnly } = require('../middleware/auth'); 
+const { sendOrderStatusEmail } = require('../utils/email');
+
+const uploadStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, path.join(__dirname, '../uploads')),
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname) || '.jpg';
+        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    },
+});
+const upload = multer({ storage: uploadStorage, limits: { fileSize: 5 * 1024 * 1024 } });
+
+// ── POST /api/orders/upload-image ── Upload an image for a personalized order ────────────────────
+router.post('/upload-image', protect, upload.single('image'), async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Please upload an image file.' });
+        }
+        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        res.status(201).json({ url: imageUrl });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ── POST /api/orders ── Place a new order ────────────────────
 router.post(
     '/',
@@ -31,7 +56,17 @@ router.post(
                 return res.status(400).json({ error: errors.array()[0].msg });
             }
 
-            const { items, deliveryAddress, paymentMethod, isSameDay } = req.body;
+            const {
+                items,
+                deliveryAddress,
+                paymentMethod,
+                isSameDay,
+                occasion,
+                recipientName,
+                giftNote,
+                orderMessage,
+                uploadedImage,
+            } = req.body;
 
             // ── Idempotency Check ─────────────────────────────────────
             // Prevent duplicate orders from same user within 30 seconds
@@ -107,32 +142,44 @@ router.post(
                 totalAmount,
                 deliveryAddress,
                 paymentMethod: paymentMethod || 'cod',
+                occasion: occasion || '',
+                recipientName: recipientName || '',
+                giftNote: giftNote || '',
+                orderMessage: orderMessage || '',
+                uploadedImage: uploadedImage || '',
                 isSameDay: isSameDay || false,
                 status: 'confirmed',
+                statusUpdatedAt: new Date()
             });
 
-            // Automatically notify admins via Socket.io
-            const timestamp = new Date().toLocaleTimeString();
-            const notificationData = {
-                orderId: order._id,
-                customerName: deliveryAddress.fullName,
-                phone: deliveryAddress.phone,
-                totalAmount,
-                hasCustomization: enrichedItems.some(i => i.customMessage || i.uploadedImage),
-                timestamp
-            };
-
-            // Safe emission check
+            // Real-time Notification for Admins
             if (req.io) {
-                req.io.to('admins').emit('admin_order_notification', notificationData);
+                req.io.to('admins').emit('admin_order_notification', {
+                    orderId: order._id,
+                    customerName: deliveryAddress.fullName,
+                    amount: totalAmount,
+                    itemsCount: enrichedItems.length,
+                    timestamp: new Date().toLocaleTimeString(),
+                    type: 'order'
+                });
             }
 
-            // Log the notification to a file
-            const logEntry = `[${new Date().toISOString()}] NOTIFICATION_EMITTED: ${JSON.stringify(notificationData)}\n`;
-            const logPath = path.join(__dirname, '../notifications.log');
-            fs.appendFile(logPath, logEntry, (err) => {
-                if (err) console.error("❌ Critical: Failed to write to notification log:", err);
-            });
+            // Web Push Notification for Admins
+            try {
+                const admins = await User.find({ role: 'admin', pushSubscription: { $exists: true } });
+                const pushPayload = JSON.stringify({
+                    title: '👑 New Royal Order!',
+                    body: `${deliveryAddress.fullName} just spent ${totalAmount} on a surprise.`,
+                    url: '/admin'
+                });
+
+                admins.forEach(admin => {
+                    webpush.sendNotification(admin.pushSubscription, pushPayload)
+                        .catch(err => console.error("Push Error for Admin:", admin.email, err));
+                });
+            } catch (pushErr) {
+                console.error("Push notification logic failed:", pushErr);
+            }
 
             res.status(201).json({ 
                 message: 'Thank you for your order! It has been placed successfully. You can view your order details and track status in your profile section.', 
@@ -248,7 +295,7 @@ router.get('/most-bought', async (req, res, next) => {
 router.get('/track/:id', async (req, res, next) => {
     try {
         const order = await Order.findById(req.params.id)
-            .select('status items totalAmount estimatedDelivery createdAt trackingId');
+            .select('status items totalAmount estimatedDeliveryDate adminNote trackingNumber courierPartner createdAt');
         if (!order) return res.status(404).json({ error: 'Order not found.' });
         res.json({ order });
     } catch (err) {
@@ -323,13 +370,48 @@ router.get('/:id', protect, async (req, res, next) => {
     }
 });
 
-// ── PATCH /api/orders/:id/status ── Update status (admin) ────
+// ── PUT /api/admin/orders/:id ── Full Update (admin) ────
+router.put(
+    '/:id',
+    protect,
+    adminOnly,
+    async (req, res, next) => {
+        try {
+            const order = await Order.findById(req.params.id).populate('user');
+            if (!order) return res.status(404).json({ error: 'Order not found.' });
+
+            const { status, estimatedDeliveryDate, adminNote, trackingNumber, courierPartner } = req.body;
+            const statusChanged = status && order.status !== status;
+
+            order.status = status || order.status;
+            order.estimatedDeliveryDate = estimatedDeliveryDate || order.estimatedDeliveryDate;
+            order.adminNote = adminNote || order.adminNote;
+            order.trackingNumber = trackingNumber || order.trackingNumber;
+            order.courierPartner = courierPartner || order.courierPartner;
+            
+            if (statusChanged) {
+                order.statusUpdatedAt = new Date();
+            }
+
+            await order.save();
+
+            if (statusChanged && order.user) {
+                sendOrderStatusEmail(order, order.user);
+            }
+
+            res.json({ message: 'Order updated successfully.', order });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// ── PATCH /api/orders/:id/status ── Update order status (admin only) ─
 router.patch(
     '/:id/status',
     protect,
     adminOnly,
-    [body('status').isIn(['pending','confirmed','processing','completed','delivered','cancelled'])
-        .withMessage('Invalid status value')],
+    [body('status').trim().notEmpty().withMessage('Status is required')],
     async (req, res, next) => {
         try {
             const errors = validationResult(req);
@@ -337,13 +419,23 @@ router.patch(
                 return res.status(400).json({ error: errors.array()[0].msg });
             }
 
-            const updates = { status: req.body.status };
-            if (req.body.trackingId) updates.trackingId = req.body.trackingId;
-
-            const order = await Order.findByIdAndUpdate(req.params.id, updates, { new: true });
+            const order = await Order.findById(req.params.id).populate('user');
             if (!order) return res.status(404).json({ error: 'Order not found.' });
 
-            res.json({ message: 'Order status updated.', order });
+            const newStatus = req.body.status;
+            const statusChanged = order.status !== newStatus;
+            order.status = newStatus;
+            if (statusChanged) {
+                order.statusUpdatedAt = new Date();
+            }
+
+            await order.save();
+
+            if (statusChanged && order.user) {
+                sendOrderStatusEmail(order, order.user);
+            }
+
+            res.json({ message: 'Order status updated successfully.', order });
         } catch (err) {
             next(err);
         }

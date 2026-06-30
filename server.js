@@ -1,5 +1,7 @@
 const express      = require('express');
 const http         = require('http');
+const path         = require('path');
+const fs           = require('fs');
 const chalk        = require('chalk'); // Added for better console logging
 const { Server }   = require('socket.io');
 const cors         = require('cors');
@@ -17,11 +19,15 @@ const giftRoutes     = require('./routes/gifts');
 const feedbackRoutes = require('./routes/feedback');
 const orderRoutes    = require('./routes/orders');
 const wishlistRoutes = require('./routes/wishlist');
+const adminRoutes    = require('./routes/admin');
 const customRequestRoutes = require('./routes/customRequests');
 const reviewRoutes   = require('./routes/reviews');
 
 const app = express();
 const server = http.createServer(app);
+
+const uploadsDir = path.join(__dirname, 'uploads');
+fs.mkdirSync(uploadsDir, { recursive: true });
 
 const allowedOrigins = [
     process.env.FRONTEND_URL,
@@ -82,13 +88,15 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login',    authLimiter);
 app.use('/api/auth/register', authLimiter);
-
+// Serve uploaded files from the backend uploads directory
+app.use('/uploads', express.static(uploadsDir));
 // ── API Routes ───────────────────────────────────────────────
 app.use('/api/auth',     authRoutes);
 app.use('/api/gifts',    giftRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/orders',   orderRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/admin',    adminRoutes);
 app.use('/api/custom-requests', customRequestRoutes);
 app.use('/api/reviews',  reviewRoutes);
 
