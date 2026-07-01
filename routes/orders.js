@@ -11,7 +11,7 @@ const User    = require('../models/User');
 const CustomRequest = require('../models/CustomRequest');
 const Review = require('../models/Review');
 const { protect, adminOnly } = require('../middleware/auth'); 
-const { sendOrderStatusEmail } = require('../utils/email');
+const { sendOrderConfirmationEmail, sendOrderStatusEmail } = require('../utils/email');
 
 const uploadStorage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, path.join(__dirname, '../uploads')),
@@ -179,6 +179,11 @@ router.post(
                 });
             } catch (pushErr) {
                 console.error("Push notification logic failed:", pushErr);
+            }
+
+            if (req.user) {
+                sendOrderConfirmationEmail(order, req.user)
+                    .catch(err => console.error('Order confirmation email failed:', err));
             }
 
             res.status(201).json({ 

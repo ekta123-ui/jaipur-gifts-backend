@@ -10,6 +10,9 @@ const rateLimit    = require('express-rate-limit');
 const jwt          = require('jsonwebtoken');
 require('dotenv').config();
 
+console.log(`🧭 Backend startup path: ${__dirname}`);
+console.log(`🌐 NODE_ENV=${process.env.NODE_ENV || 'development'}`);
+
 const connectDB      = require('./config/db');
 const errorHandler   = require('./middleware/errorHandler');
 const User           = require('./models/User');
@@ -25,6 +28,33 @@ const reviewRoutes   = require('./routes/reviews');
 
 const app = express();
 const server = http.createServer(app);
+
+const DEV_FALLBACK_USERS = [
+    {
+        name: 'Admin',
+        email: 'admin@jaipurgifts.com',
+        password: 'Admin@1234',
+        role: 'admin',
+    },
+    {
+        name: 'Demo User',
+        email: 'demo@jaipurgifts.com',
+        password: 'Demo@1234',
+        role: 'user',
+    },
+];
+
+const ensureDevAccounts = async () => {
+    if (process.env.NODE_ENV !== 'development') return;
+
+    for (const userData of DEV_FALLBACK_USERS) {
+        const existing = await User.findOne({ email: userData.email });
+        if (!existing) {
+            await User.create(userData);
+            console.log(`👤 Created fallback dev user: ${userData.email} / ${userData.password}`);
+        }
+    }
+};
 
 const uploadsDir = path.join(__dirname, 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -168,6 +198,7 @@ app.use(errorHandler);
 const startServer = async () => {
     // 1. Connect to Database FIRST
     await connectDB();
+    await ensureDevAccounts();
 
     const PORT = process.env.PORT || 5000;
 

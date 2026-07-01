@@ -84,7 +84,23 @@ const orderSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
-        estimatedDelivery: {
+        estimatedDeliveryDate: {
+            type: Date,
+            default: null,
+        },
+        adminNote: {
+            type: String,
+            default: '',
+        },
+        trackingNumber: {
+            type: String,
+            default: '',
+        },
+        courierPartner: {
+            type: String,
+            default: '',
+        },
+        statusUpdatedAt: {
             type: Date,
             default: null,
         },
@@ -94,13 +110,13 @@ const orderSchema = new mongoose.Schema(
     }
 );
 
-// Auto-set estimatedDelivery before saving
+// Auto-set estimatedDeliveryDate before saving
 orderSchema.pre('save', function (next) {
-    if (!this.estimatedDelivery) {
+    if (!this.estimatedDeliveryDate) {
         const days = this.isSameDay ? 0 : 2;
         const d = new Date();
         d.setDate(d.getDate() + days);
-        this.estimatedDelivery = d;
+        this.estimatedDeliveryDate = d;
     }
     next();
 });

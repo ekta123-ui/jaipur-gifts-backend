@@ -1,15 +1,9 @@
-const gifts = [
-  {
-    giftId: "B-001",
-    name: "Designer Truffle Cake",
-    category: "birthday",
-    price: { amount: 899, display: "₹899", currency: "INR" },
-    rating: { average: 4.9, count: 120 },
-    imgUrl: "/images/Tuffle.jpg",
-    tag: "Bestseller",
-    description: "Handcrafted chocolate truffle cake."
-  },
-  // ... Repeat for other items
-];
+/**
+ * Compatibility seed entry.
+ *
+ * The complete gift catalog lives in seed/seed.js and mirrors
+ * jaipur-gifts-frontend/src/data/gifts.js. Keep one source of truth so giftId
+ * values do not become different between seed files.
+ */
 
-// Logic to insert many into 'gifts' collection
+require('./seed/seed');
