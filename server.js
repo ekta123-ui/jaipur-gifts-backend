@@ -62,31 +62,31 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 const allowedOrigins = [
     process.env.FRONTEND_URL,
     process.env.CLIENT_URL,
+    process.env.ADMIN_URL,
     "https://jaipur-gifts.netlify.app",
+    "https://jaipuradmin.netlify.app",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
-    "http://127.0.0.1:5175"
+    "http://127.0.0.1:5175",
 ].filter(Boolean);
 
 const io = new Server(server, {
     cors: {
         origin: allowedOrigins,
-        credentials: true
-    }
+        credentials: true,
+    },
 });
 
-// Inject IO into requests at the very beginning of the stack
+// Inject IO into requests
 app.use((req, _res, next) => {
     req.io = io;
     next();
 });
 
-// ── Global Middleware ────────────────────────────────────────
-
-// CORS — allow the allowed origins list
+// CORS
 app.use(cors({
     origin: allowedOrigins,
     credentials: true,
