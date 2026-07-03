@@ -1,4 +1,5 @@
 const express = require('express');
+console.log("✅ auth.js loaded");
 const router  = express.Router();
 const jwt     = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
@@ -162,5 +163,6 @@ router.put(
         }
     }
 );
+console.log("✅ Register route:", router.stack.map(r => r.route?.path));
 
 module.exports = router;
