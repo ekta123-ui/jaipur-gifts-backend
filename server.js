@@ -2,7 +2,6 @@ const express      = require('express');
 const http         = require('http');
 const path         = require('path');
 const fs           = require('fs');
-const chalk        = require('chalk'); // Added for better console logging
 const { Server }   = require('socket.io');
 const cors         = require('cors');
 const morgan       = require('morgan');
@@ -224,4 +223,8 @@ const startServer = async () => {
 };
 app.set('trust proxy', 1);
 
-startServer();
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = app;
