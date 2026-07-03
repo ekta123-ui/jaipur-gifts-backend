@@ -120,8 +120,17 @@ app.use('/api/auth/login',    authLimiter);
 app.use('/api/auth/register', authLimiter);
 // Serve uploaded files from the backend uploads directory
 app.use('/uploads', express.static(uploadsDir));
-// ── API Routes ───────────────────────────────────────────────
-app.use('/api/auth',     authRoutes);
+app.get('/api/test', (req, res) => {
+    res.json({
+        success: true,
+        message: "Latest server.js is running"
+    });
+});
+console.log("✅ About to load auth routes...");
+
+app.use('/api/auth', authRoutes);
+
+console.log("✅ Auth routes loaded successfully");
 app.use('/api/gifts',    giftRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/orders',   orderRoutes);
